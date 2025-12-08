@@ -1,7 +1,7 @@
 {
-  "url": "http://localhost:3000",
+  "url": "https://tma-ton-shield.vercel.app",
   "name": "TON Shield AI",
-  "iconUrl": "http://localhost:3000/icon.svg",
-  "termsOfUseUrl": "http://localhost:3000/terms",
-  "privacyPolicyUrl": "http://localhost:3000/privacy"
+  "iconUrl": "https://tma-ton-shield.vercel.app/icon.svg",
+  "termsOfUseUrl": "https://tma-ton-shield.vercel.app/terms",
+  "privacyPolicyUrl": "https://tma-ton-shield.vercel.app/privacy"
 }
