@@ -6,13 +6,14 @@ import { useTelegram } from '@/lib/hooks/useTelegram';
 import { AddressResponse } from '@/lib/api/types';
 import { RiskBadge } from '@/components/RiskBadge';
 import { isValidTonAddress, shortenAddress, formatTon, formatDate } from '@/lib/utils';
+import { saveToHistory } from '@/lib/storage/history';
 import { FileText, ArrowLeft, AlertCircle, CheckCircle } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 
 export default function AddressCheckPage() {
   const router = useRouter();
   const { analyzeAddress, isLoading, error } = useAnalyze();
-  const { hapticFeedback } = useTelegram();
+  const { user, hapticFeedback } = useTelegram();
 
   const [address, setAddress] = useState('');
   const [result, setResult] = useState<AddressResponse | null>(null);
@@ -41,6 +42,17 @@ export default function AddressCheckPage() {
     if (data) {
       setResult(data);
       console.log('Result set successfully');
+      
+      // Save to history
+      if (user) {
+        saveToHistory(user.id.toString(), {
+          type: 'address',
+          target: data.account_info.address,
+          risk_level: data.risk_level,
+          risk_score: data.risk_score,
+          result_summary: data.ai_summary?.verdict,
+        });
+      }
       
       if (data.risk_level === 'CRITICAL') {
         hapticFeedback('error');

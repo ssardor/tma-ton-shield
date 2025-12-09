@@ -8,6 +8,7 @@ import {
   HistoryParams,
   StatsResponse,
 } from '../api/types';
+import { getHistory, getHistoryStats } from '../storage/history';
 
 export function useDashboard(userId: string | null) {
   const [dashboard, setDashboard] = useState<DashboardResponse | null>(null);
@@ -20,8 +21,39 @@ export function useDashboard(userId: string | null) {
     setIsLoading(true);
     setError(null);
     try {
-      const data = await apiClient.getDashboard(userId);
-      setDashboard(data);
+      // Get stats from localStorage
+      const stats = getHistoryStats(userId);
+      const history = getHistory(userId);
+      
+      // Get recent critical items
+      const recentCritical = history
+        .filter(item => item.risk_level === 'CRITICAL')
+        .slice(0, 5)
+        .map(item => ({
+          id: item.id,
+          type: item.type,
+          target: item.target,
+          risk_level: item.risk_level,
+          risk_score: item.risk_score,
+          created_at: item.timestamp,
+          summary: item.result_summary,
+        }));
+      
+      setDashboard({
+        user_id: userId,
+        stats: {
+          total_checks: stats.total,
+          checks_today: 0, // Can be calculated if needed
+          safe_count: stats.safe,
+          warning_count: stats.warning,
+          critical_count: stats.critical,
+          safe_percentage: stats.total > 0 ? (stats.safe / stats.total) * 100 : 0,
+          warning_percentage: stats.total > 0 ? (stats.warning / stats.total) * 100 : 0,
+          critical_percentage: stats.total > 0 ? (stats.critical / stats.total) * 100 : 0,
+        },
+        recent_critical: recentCritical,
+        risk_timeline: [], // Can be calculated from history if needed
+      });
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Failed to load dashboard';
       setError(message);
@@ -53,8 +85,37 @@ export function useHistory(userId: string | null, params?: HistoryParams) {
     setIsLoading(true);
     setError(null);
     try {
-      const data = await apiClient.getHistory(userId, params);
-      setHistory(data);
+      // Get history from localStorage
+      const localHistory = getHistory(userId);
+      
+      // Apply filters
+      let filteredItems = localHistory;
+      if (params?.type) {
+        filteredItems = filteredItems.filter(item => item.type === params.type);
+      }
+      if (params?.risk_level) {
+        filteredItems = filteredItems.filter(item => item.risk_level === params.risk_level);
+      }
+      
+      // Apply pagination
+      const limit = params?.limit || 20;
+      const offset = params?.offset || 0;
+      const paginatedItems = filteredItems.slice(offset, offset + limit);
+      
+      setHistory({
+        items: paginatedItems.map(item => ({
+          id: item.id,
+          type: item.type,
+          target: item.target,
+          risk_level: item.risk_level,
+          risk_score: item.risk_score,
+          created_at: item.timestamp,
+          summary: item.result_summary,
+        })),
+        total: filteredItems.length,
+        limit,
+        offset,
+      });
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Failed to load history';
       setError(message);
@@ -69,13 +130,37 @@ export function useHistory(userId: string | null, params?: HistoryParams) {
     const nextOffset = (history.offset || 0) + (history.limit || 20);
     setIsLoading(true);
     try {
-      const data = await apiClient.getHistory(userId, {
-        ...params,
-        offset: nextOffset,
-      });
+      // Get history from localStorage
+      const localHistory = getHistory(userId);
+      
+      // Apply filters
+      let filteredItems = localHistory;
+      if (params?.type) {
+        filteredItems = filteredItems.filter(item => item.type === params.type);
+      }
+      if (params?.risk_level) {
+        filteredItems = filteredItems.filter(item => item.risk_level === params.risk_level);
+      }
+      
+      const limit = params?.limit || 20;
+      const paginatedItems = filteredItems.slice(nextOffset, nextOffset + limit);
+      
       setHistory({
-        ...data,
-        items: [...history.items, ...data.items],
+        items: [
+          ...history.items,
+          ...paginatedItems.map(item => ({
+            id: item.id,
+            type: item.type,
+            target: item.target,
+            risk_level: item.risk_level,
+            risk_score: item.risk_score,
+            created_at: item.timestamp,
+            summary: item.result_summary,
+          }))
+        ],
+        total: filteredItems.length,
+        limit,
+        offset: nextOffset,
       });
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Failed to load more';

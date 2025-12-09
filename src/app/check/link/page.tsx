@@ -6,6 +6,7 @@ import { useTelegram } from '@/lib/hooks/useTelegram';
 import { LinkResponse } from '@/lib/api/types';
 import { RiskBadge } from '@/components/RiskBadge';
 import { isValidUrl, normalizeUrl } from '@/lib/utils';
+import { saveToHistory } from '@/lib/storage/history';
 import { Link2, AlertCircle, CheckCircle, Share2, ArrowLeft } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 
@@ -17,7 +18,7 @@ const EXAMPLE_LINKS = [
 export default function LinkScannerPage() {
   const router = useRouter();
   const { analyzeLink, isLoading, error } = useAnalyze();
-  const { hapticFeedback, share } = useTelegram();
+  const { user, hapticFeedback, share } = useTelegram();
   const [url, setUrl] = useState('');
   const [result, setResult] = useState<LinkResponse | null>(null);
   const [urlError, setUrlError] = useState('');
@@ -44,6 +45,17 @@ export default function LinkScannerPage() {
     const data = await analyzeLink(normalizedUrl);
     if (data) {
       setResult(data);
+      
+      // Save to history
+      if (user) {
+        saveToHistory(user.id.toString(), {
+          type: 'link',
+          target: data.url,
+          risk_level: data.risk_level,
+          risk_score: data.risk_score,
+          result_summary: data.ai_summary?.verdict,
+        });
+      }
       
       // Haptic feedback based on risk level
       if (data.risk_level === 'CRITICAL') {

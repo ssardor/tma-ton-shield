@@ -6,6 +6,7 @@ import { useTelegram } from '@/lib/hooks/useTelegram';
 import { JettonResponse } from '@/lib/api/types';
 import { RiskBadge } from '@/components/RiskBadge';
 import { isValidTonAddress, shortenAddress } from '@/lib/utils';
+import { saveToHistory } from '@/lib/storage/history';
 import { Coins, ArrowLeft, AlertCircle, CheckCircle, Image as ImageIcon } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 
@@ -17,7 +18,7 @@ const POPULAR_JETTONS = [
 export default function JettonAnalysisPage() {
   const router = useRouter();
   const { analyzeJetton, isLoading, error } = useAnalyze();
-  const { hapticFeedback } = useTelegram();
+  const { user, hapticFeedback } = useTelegram();
 
   const [address, setAddress] = useState('');
   const [result, setResult] = useState<JettonResponse | null>(null);
@@ -43,6 +44,17 @@ export default function JettonAnalysisPage() {
     const data = await analyzeJetton(addressToCheck);
     if (data) {
       setResult(data);
+      
+      // Save to history
+      if (user) {
+        saveToHistory(user.id.toString(), {
+          type: 'jetton',
+          target: addressToCheck,
+          risk_level: data.risk_level,
+          risk_score: data.risk_score,
+          result_summary: data.ai_summary?.verdict || `${data.metadata.name} (${data.metadata.symbol})`,
+        });
+      }
       
       if (data.risk_level === 'CRITICAL') {
         hapticFeedback('error');
