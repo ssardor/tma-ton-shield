@@ -40,6 +40,13 @@ export interface TransactionResponse {
   created_at: string;
 }
 
+// Transaction Pattern Analysis (NEW in backend)
+export interface TransactionPatternAnalysis {
+  total_analyzed: number;
+  suspicious_patterns: string[];
+  risk_indicators: string[];
+}
+
 // Address Check
 export interface AddressResponse {
   risk_level: RiskLevel;
@@ -53,6 +60,7 @@ export interface AddressResponse {
     balance?: string;
     last_activity?: string;
   };
+  transaction_analysis?: TransactionPatternAnalysis; // NEW: Backend pattern analysis
   created_at: string;
 }
 
