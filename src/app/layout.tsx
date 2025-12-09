@@ -3,6 +3,7 @@ import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import { TonConnectProvider } from "@/providers/TonConnectProvider";
 import { TelegramProvider } from "@/providers/TelegramProvider";
+import { AppProvider } from "@/lib/i18n/AppContext";
 import { Navigation } from "@/components/Navigation";
 
 const geistSans = Geist({
@@ -28,16 +29,18 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body
-        className={`${geistSans.variable} ${geistMono.variable} antialiased bg-gray-50`}
+        className={`${geistSans.variable} ${geistMono.variable} antialiased bg-gray-50 dark:bg-gray-900`}
       >
-        <TonConnectProvider>
-          <TelegramProvider>
-            <main className="min-h-screen pb-20 bg-gray-50">
-              {children}
-            </main>
-            <Navigation />
-          </TelegramProvider>
-        </TonConnectProvider>
+        <AppProvider>
+          <TonConnectProvider>
+            <TelegramProvider>
+              <main className="min-h-screen pb-20 bg-gray-50 dark:bg-gray-900">
+                {children}
+              </main>
+              <Navigation />
+            </TelegramProvider>
+          </TonConnectProvider>
+        </AppProvider>
       </body>
     </html>
   );
