@@ -27,14 +27,26 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en">
+    <html lang="en" suppressHydrationWarning>
+      <head>
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `
+              try {
+                const theme = localStorage.getItem('theme') || 'light';
+                document.documentElement.classList.add(theme);
+              } catch (e) {}
+            `,
+          }}
+        />
+      </head>
       <body
-        className={`${geistSans.variable} ${geistMono.variable} antialiased bg-gray-50 dark:bg-gray-900`}
+        className={`${geistSans.variable} ${geistMono.variable} antialiased bg-gray-50 dark:bg-gray-900 transition-colors duration-200`}
       >
         <AppProvider>
           <TonConnectProvider>
             <TelegramProvider>
-              <main className="min-h-screen pb-20 bg-gray-50 dark:bg-gray-900">
+              <main className="min-h-screen pb-20 bg-gray-50 dark:bg-gray-900 transition-colors duration-200">
                 {children}
               </main>
               <Navigation />
