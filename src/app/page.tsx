@@ -2,16 +2,54 @@
 
 import { useTelegram } from '@/lib/hooks/useTelegram';
 import { useHistory } from '@/lib/hooks/useDashboard';
+import { useWalletTransactions } from '@/lib/hooks/useWalletTransactions';
 import { useApp } from '@/lib/i18n/AppContext';
+import { useTonAddress } from '@tonconnect/ui-react';
 import { TonConnectButton } from '@tonconnect/ui-react';
-import { Shield, Link2, FileText, Coins, Globe, Languages } from 'lucide-react';
+import { Shield, Link2, FileText, Coins, Globe, Languages, ArrowUpRight, ArrowDownLeft } from 'lucide-react';
 import Link from 'next/link';
 import { HistoryList } from '@/components/HistoryList';
+import { useMemo } from 'react';
 
 export default function Home() {
   const { user } = useTelegram();
-  const { history, isLoading } = useHistory(user?.id.toString() || null, { limit: 3 });
+  const walletAddress = useTonAddress();
+  const { history, isLoading: historyLoading } = useHistory(user?.id.toString() || null, { limit: 3 });
+  const { transactions, isLoading: txLoading } = useWalletTransactions(walletAddress || null, 5);
   const { language, setLanguage, t } = useApp();
+
+  // Combine history and transactions
+  const combinedActivity = useMemo(() => {
+    const items = [];
+    
+    // Add check history
+    if (history?.items) {
+      items.push(...history.items.map(item => ({
+        ...item,
+        activityType: 'check' as const,
+      })));
+    }
+    
+    // Add wallet transactions
+    if (transactions?.events) {
+      items.push(...transactions.events.slice(0, 3).map(event => ({
+        id: event.event_id,
+        type: 'transaction' as const,
+        activityType: 'transaction' as const,
+        target: event.actions?.[0]?.simple_preview?.description || 'Transaction',
+        risk_level: 'SAFE' as const,
+        risk_score: 0,
+        created_at: new Date(event.timestamp * 1000).toISOString(),
+        summary: event.actions?.[0]?.simple_preview?.description,
+        event_data: event, // Keep full event data
+      })));
+    }
+    
+    // Sort by timestamp
+    return items
+      .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
+      .slice(0, 5);
+  }, [history, transactions]);
 
   return (
     <div className="max-w-lg mx-auto px-4 py-6 space-y-6">
@@ -111,18 +149,62 @@ export default function Home() {
             {t('viewAll')}
           </Link>
         </div>
-        {isLoading ? (
+        {historyLoading || txLoading ? (
           <div className="bg-white rounded-lg border border-gray-200 p-8 text-center">
             <div className="animate-pulse text-gray-600">{t('loading')}</div>
           </div>
+        ) : combinedActivity.length === 0 ? (
+          <div className="bg-white rounded-lg border border-gray-200 p-8 text-center">
+            <p className="text-gray-500">{t('noActivity')}</p>
+          </div>
         ) : (
-          <HistoryList 
-            items={history?.items || []}
-            onItemClick={(item) => {
-              // Navigate to detail page based on type
-              window.location.href = `/check/${item.type}?target=${encodeURIComponent(item.target)}`;
-            }}
-          />
+          <div className="space-y-2">
+            {combinedActivity.map((item) => (
+              <div
+                key={item.id}
+                className="bg-white rounded-lg border border-gray-200 p-4 hover:border-blue-300 transition-colors cursor-pointer"
+                onClick={() => {
+                  if (item.activityType === 'check') {
+                    window.location.href = `/check/${item.type}?target=${encodeURIComponent(item.target)}`;
+                  }
+                }}
+              >
+                <div className="flex items-start justify-between">
+                  <div className="flex-1">
+                    <div className="flex items-center gap-2 mb-1">
+                      {item.activityType === 'transaction' ? (
+                        <ArrowUpRight className="w-4 h-4 text-blue-600" />
+                      ) : item.type === 'link' ? (
+                        <Link2 className="w-4 h-4 text-blue-600" />
+                      ) : item.type === 'address' ? (
+                        <FileText className="w-4 h-4 text-green-600" />
+                      ) : (
+                        <Coins className="w-4 h-4 text-amber-600" />
+                      )}
+                      <span className="text-xs font-medium text-gray-500 uppercase">
+                        {item.activityType === 'transaction' ? 'Transaction' : item.type}
+                      </span>
+                    </div>
+                    <p className="text-sm font-medium text-gray-900 truncate">
+                      {'summary' in item && item.summary ? item.summary : item.target}
+                    </p>
+                    <p className="text-xs text-gray-500 mt-1">
+                      {new Date(item.created_at).toLocaleString()}
+                    </p>
+                  </div>
+                  {item.activityType === 'check' && (
+                    <div className={`text-xs font-bold px-2 py-1 rounded ${
+                      item.risk_level === 'SAFE' ? 'bg-green-100 text-green-700' :
+                      item.risk_level === 'WARNING' ? 'bg-yellow-100 text-yellow-700' :
+                      'bg-red-100 text-red-700'
+                    }`}>
+                      {item.risk_level}
+                    </div>
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
         )}
       </div>
     </div>
