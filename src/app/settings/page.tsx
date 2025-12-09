@@ -2,8 +2,9 @@
 
 import { useTelegram } from '@/lib/hooks/useTelegram';
 import { useTonConnectUI, useTonAddress } from '@tonconnect/ui-react';
-import { Settings as SettingsIcon, User, Wallet, LogOut, Info, Shield } from 'lucide-react';
+import { Settings as SettingsIcon, User, Wallet, LogOut, Info, Shield, ChevronRight } from 'lucide-react';
 import { shortenAddress } from '@/lib/utils';
+import Link from 'next/link';
 
 export default function SettingsPage() {
   const { user } = useTelegram();
@@ -103,6 +104,27 @@ export default function SettingsPage() {
             </p>
           </div>
         )}
+      </div>
+
+      {/* Security Settings */}
+      <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
+        <div className="p-4 border-b border-gray-200">
+          <div className="flex items-center gap-2">
+            <Shield className="w-5 h-5 text-gray-600" />
+            <h2 className="font-semibold text-gray-900">Security</h2>
+          </div>
+        </div>
+        
+        <Link
+          href="/skiplist"
+          className="flex items-center justify-between p-4 hover:bg-gray-50 transition-colors group"
+        >
+          <div>
+            <p className="font-medium text-gray-900 mb-0.5">Skiplist</p>
+            <p className="text-sm text-gray-600">Manage trusted addresses & domains</p>
+          </div>
+          <ChevronRight className="w-5 h-5 text-gray-400 group-hover:text-gray-600" />
+        </Link>
       </div>
 
       {/* About */}
