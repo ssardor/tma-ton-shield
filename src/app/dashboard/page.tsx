@@ -272,18 +272,21 @@ export default function DashboardPage() {
             {combinedHistory.map((item) => (
               <div
                 key={item.id}
-                className="bg-white rounded-lg border border-gray-200 p-4 hover:border-blue-300 transition-colors cursor-pointer"
+                className="bg-white rounded-lg border border-gray-200 p-3 hover:border-blue-300 transition-colors cursor-pointer"
                 onClick={() => {
                   if (item.activityType === 'check') {
                     window.location.href = `/check/${item.type}?target=${encodeURIComponent(item.target)}`;
                   }
                 }}
               >
-                <div className="flex items-start justify-between">
-                  <div className="flex-1">
+                <div className="flex items-start justify-between gap-2">
+                  <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 mb-1">
                       {item.activityType === 'transaction' ? (
-                        <ArrowUpRight className="w-4 h-4 text-blue-600" />
+                        <>
+                          <ArrowUpRight className="w-3.5 h-3.5 text-blue-600 flex-shrink-0" />
+                          <span className="text-xs font-medium text-gray-500 uppercase">Transaction</span>
+                        </>
                       ) : (
                         <span className="text-xs font-medium text-gray-500 uppercase">
                           {item.type}
@@ -294,11 +297,11 @@ export default function DashboardPage() {
                       {'summary' in item && item.summary ? item.summary : item.target}
                     </p>
                     <p className="text-xs text-gray-500 mt-1">
-                      {new Date(item.created_at).toLocaleString()}
+                      {new Date(item.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
                     </p>
                   </div>
                   {item.activityType === 'check' && (
-                    <div className={`text-xs font-bold px-2 py-1 rounded ${
+                    <div className={`text-xs font-bold px-2 py-1 rounded flex-shrink-0 ${
                       item.risk_level === 'SAFE' ? 'bg-green-100 text-green-700' :
                       item.risk_level === 'WARNING' ? 'bg-yellow-100 text-yellow-700' :
                       'bg-red-100 text-red-700'
