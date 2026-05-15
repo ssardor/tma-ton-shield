@@ -4,10 +4,14 @@ const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || '';
 const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '';
 
 if (!supabaseUrl || !supabaseAnonKey) {
-  console.warn('Supabase credentials missing. Please check your .env.local file.');
+  console.warn('Supabase credentials missing. Please check your .env.local file. Using placeholders for build.');
 }
 
-export const supabase = createClient(supabaseUrl, supabaseAnonKey);
+// Provide placeholders so the build doesn't crash if env vars are omitted in Vercel during build phase
+export const supabase = createClient(
+  supabaseUrl || 'https://placeholder.supabase.co', 
+  supabaseAnonKey || 'placeholder'
+);
 
 export type Profile = {
   id: string;
