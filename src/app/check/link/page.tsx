@@ -5,6 +5,8 @@ import { useAnalyze } from '@/lib/hooks/useAnalyze';
 import { useTelegram } from '@/lib/hooks/useTelegram';
 import { LinkResponse } from '@/lib/api/types';
 import { RiskBadge } from '@/components/RiskBadge';
+import { SkiplistButtons } from '@/components/SkiplistButtons';
+import { ScanningAnimation } from '@/components/ScanningAnimation';
 import { isValidUrl, normalizeUrl } from '@/lib/utils';
 import { saveToHistory } from '@/lib/storage/history';
 import { Link2, AlertCircle, CheckCircle, Share2, ArrowLeft } from 'lucide-react';
@@ -165,8 +167,11 @@ export default function LinkScannerPage() {
         )}
       </div>
 
+      {/* Loading Animation */}
+      {isLoading && <ScanningAnimation />}
+
       {/* Result Section */}
-      {result && (
+      {!isLoading && result && (
         <div className="space-y-4">
           {/* Telegram Bot/Mini App Info */}
           {result.is_telegram_link && (
@@ -344,6 +349,13 @@ export default function LinkScannerPage() {
               </div>
             </div>
           )}
+
+          {/* Skiplist Actions */}
+          <SkiplistButtons
+            target={result.bot_username || result.url}
+            type="link"
+            label={result.bot_username ? `@${result.bot_username}` : result.domain}
+          />
 
           {/* Share Button */}
           <button

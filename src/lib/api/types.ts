@@ -48,6 +48,20 @@ export interface TransactionPatternAnalysis {
 }
 
 // Address Check
+export interface RecentTransactionInfo {
+  event_id: string;
+  timestamp: number;
+  type: string;
+  direction: 'in' | 'out';
+  amount?: string;
+  counterparty?: {
+    address: string;
+    name?: string;
+    is_scam: boolean;
+  };
+  description: string;
+}
+
 export interface AddressResponse {
   risk_level: RiskLevel;
   risk_score: number;
@@ -58,13 +72,26 @@ export interface AddressResponse {
     is_scam: boolean;
     is_wallet: boolean;
     balance?: string;
-    last_activity?: string;
+    last_activity?: string | null;
+    status?: string;
+    interfaces?: string[];
+    name?: string;
   };
-  transaction_analysis?: TransactionPatternAnalysis; // NEW: Backend pattern analysis
+  account_age_hours?: number | null;
+  recent_transactions?: RecentTransactionInfo[];
+  transaction_analysis?: TransactionPatternAnalysis;
   created_at: string;
 }
 
 // Jetton Analysis
+export interface TopHolderInfo {
+  address: string;
+  name?: string;
+  balance: string;
+  percentage: number;
+  is_dex: boolean;
+}
+
 export interface JettonResponse {
   risk_level: RiskLevel;
   risk_score: number;
@@ -77,9 +104,13 @@ export interface JettonResponse {
     description?: string;
     image?: string;
   };
-  admin_address?: string;
+  admin_address?: string | null;
   total_supply?: string;
   holder_count?: number;
+  mintable?: boolean;
+  verification?: 'whitelist' | 'blacklist' | 'none';
+  top_holders?: TopHolderInfo[];
+  holder_concentration_pct?: number;
   created_at: string;
 }
 
@@ -109,6 +140,8 @@ export interface LinkResponse {
   is_telegram_link: boolean;
   bot_username?: string;
   telegram_analysis?: TelegramAnalysis;
+  suspicious_keywords?: string[];
+  typosquatting_target?: string | null;
   created_at: string;
 }
 

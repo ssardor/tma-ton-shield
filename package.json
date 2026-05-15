@@ -9,6 +9,7 @@
     "lint": "eslint"
   },
   "dependencies": {
+    "@supabase/supabase-js": "^2.105.4",
     "@ton/core": "^0.62.0",
     "@tonconnect/ui-react": "^2.3.1",
     "@twa-dev/sdk": "^8.0.2",

@@ -5,9 +5,11 @@ import { useAnalyze } from '@/lib/hooks/useAnalyze';
 import { useTelegram } from '@/lib/hooks/useTelegram';
 import { JettonResponse } from '@/lib/api/types';
 import { RiskBadge } from '@/components/RiskBadge';
+import { SkiplistButtons } from '@/components/SkiplistButtons';
+import { ScanningAnimation } from '@/components/ScanningAnimation';
 import { isValidTonAddress, shortenAddress } from '@/lib/utils';
 import { saveToHistory } from '@/lib/storage/history';
-import { Coins, ArrowLeft, AlertCircle, CheckCircle, Image as ImageIcon } from 'lucide-react';
+import { Coins, ArrowLeft, AlertCircle, CheckCircle, Image as ImageIcon, ShieldAlert, ShieldCheck, Users, Unlock, Lock } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 
 const POPULAR_JETTONS = [
@@ -66,6 +68,30 @@ export default function JettonAnalysisPage() {
     }
   };
 
+  const getVerificationBadge = (verification?: string) => {
+    if (verification === 'whitelist') {
+      return (
+        <span className="inline-flex items-center gap-1 px-2.5 py-1 bg-green-100 text-green-800 text-xs font-bold rounded-full">
+          <ShieldCheck className="w-3.5 h-3.5" />
+          Verified
+        </span>
+      );
+    }
+    if (verification === 'blacklist') {
+      return (
+        <span className="inline-flex items-center gap-1 px-2.5 py-1 bg-red-100 text-red-800 text-xs font-bold rounded-full">
+          <ShieldAlert className="w-3.5 h-3.5" />
+          Blacklisted
+        </span>
+      );
+    }
+    return (
+      <span className="inline-flex items-center gap-1 px-2.5 py-1 bg-gray-100 text-gray-600 text-xs font-bold rounded-full">
+        Unverified
+      </span>
+    );
+  };
+
   return (
     <div className="max-w-lg mx-auto px-4 py-6 space-y-6">
       {/* Header */}
@@ -81,7 +107,7 @@ export default function JettonAnalysisPage() {
             <Coins className="w-6 h-6 text-amber-600" />
             Jetton Analysis
           </h1>
-          <p className="text-sm text-gray-600">Check token safety</p>
+          <p className="text-sm text-gray-600">Anti-rugpull scanner</p>
         </div>
       </div>
 
@@ -154,8 +180,11 @@ export default function JettonAnalysisPage() {
         )}
       </div>
 
+      {/* Loading Animation */}
+      {isLoading && <ScanningAnimation />}
+
       {/* Result */}
-      {result && (
+      {!isLoading && result && (
         <div className="space-y-4">
           {/* Jetton Info */}
           <div className="bg-white rounded-lg border border-gray-200 p-4 space-y-4">
@@ -173,14 +202,14 @@ export default function JettonAnalysisPage() {
                   </div>
                 )}
                 <div className="flex-1 min-w-0">
-                  <h3 className="font-bold text-lg text-gray-900">
-                    {result.metadata.name}
-                  </h3>
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <h3 className="font-bold text-lg text-gray-900">
+                      {result.metadata.name}
+                    </h3>
+                    {getVerificationBadge(result.verification)}
+                  </div>
                   <p className="text-sm text-gray-600 font-mono">
                     {result.metadata.symbol}
-                  </p>
-                  <p className="text-xs text-gray-500 mt-1">
-                    Decimals: {result.metadata.decimals}
                   </p>
                 </div>
               </div>
@@ -193,21 +222,43 @@ export default function JettonAnalysisPage() {
               </p>
             )}
 
-            {/* Stats */}
+            {/* Stats Grid */}
             <div className="grid grid-cols-2 gap-3 pt-3 border-t border-gray-100">
               {result.total_supply && (
                 <div>
                   <p className="text-xs text-gray-500 mb-1">Total Supply</p>
-                  <p className="font-mono text-sm font-medium">
-                    {parseInt(result.total_supply).toLocaleString()}
+                  <p className="font-mono text-sm font-medium text-gray-900">
+                    {parseFloat(result.total_supply).toLocaleString(undefined, { maximumFractionDigits: 0 })}
                   </p>
                 </div>
               )}
               {result.holder_count !== undefined && (
                 <div>
                   <p className="text-xs text-gray-500 mb-1">Holders</p>
-                  <p className="font-mono text-sm font-medium">
+                  <p className="font-mono text-sm font-medium text-gray-900 flex items-center gap-1">
+                    <Users className="w-3.5 h-3.5 text-gray-500" />
                     {result.holder_count.toLocaleString()}
+                  </p>
+                </div>
+              )}
+              {result.mintable !== undefined && (
+                <div>
+                  <p className="text-xs text-gray-500 mb-1">Mintable</p>
+                  <p className={`text-sm font-medium flex items-center gap-1 ${result.mintable && result.admin_address ? 'text-red-700' : result.mintable ? 'text-amber-700' : 'text-green-700'}`}>
+                    {result.mintable ? <Unlock className="w-3.5 h-3.5" /> : <Lock className="w-3.5 h-3.5" />}
+                    {result.mintable ? (result.admin_address ? 'Yes (Admin Active)' : 'Yes (No Admin)') : 'No'}
+                  </p>
+                </div>
+              )}
+              {result.holder_concentration_pct !== undefined && (
+                <div>
+                  <p className="text-xs text-gray-500 mb-1">Top-3 Concentration</p>
+                  <p className={`font-mono text-sm font-bold ${
+                    result.holder_concentration_pct > 50 ? 'text-red-700' :
+                    result.holder_concentration_pct > 30 ? 'text-amber-700' :
+                    'text-green-700'
+                  }`}>
+                    {result.holder_concentration_pct.toFixed(1)}%
                   </p>
                 </div>
               )}
@@ -223,11 +274,84 @@ export default function JettonAnalysisPage() {
             )}
           </div>
 
+          {/* Holder Distribution */}
+          {result.top_holders && result.top_holders.length > 0 && (
+            <div className="bg-white rounded-lg border border-gray-200 p-4 space-y-3">
+              <h3 className="font-semibold text-gray-900 flex items-center gap-2">
+                <Users className="w-5 h-5 text-purple-600" />
+                Top Holders
+              </h3>
+              
+              {/* Bar visualization */}
+              {result.holder_concentration_pct !== undefined && (
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between text-xs text-gray-600">
+                    <span>Top-3 non-DEX holders</span>
+                    <span className={`font-bold ${
+                      result.holder_concentration_pct > 50 ? 'text-red-700' :
+                      result.holder_concentration_pct > 30 ? 'text-amber-700' :
+                      'text-green-700'
+                    }`}>
+                      {result.holder_concentration_pct.toFixed(1)}%
+                    </span>
+                  </div>
+                  <div className="w-full bg-gray-200 rounded-full h-3 overflow-hidden">
+                    <div
+                      className={`h-full rounded-full transition-all duration-500 ${
+                        result.holder_concentration_pct > 50 ? 'bg-red-500' :
+                        result.holder_concentration_pct > 30 ? 'bg-amber-500' :
+                        'bg-green-500'
+                      }`}
+                      style={{ width: `${Math.min(result.holder_concentration_pct, 100)}%` }}
+                    />
+                  </div>
+                  {result.holder_concentration_pct > 50 && (
+                    <p className="text-xs text-red-700 font-semibold flex items-center gap-1">
+                      <AlertCircle className="w-3.5 h-3.5" />
+                      Extreme concentration — high rugpull risk!
+                    </p>
+                  )}
+                </div>
+              )}
+
+              {/* Holder list */}
+              <div className="space-y-2 mt-3">
+                {result.top_holders.slice(0, 5).map((holder, idx) => (
+                  <div
+                    key={idx}
+                    className="flex items-center justify-between gap-2 p-2 bg-gray-50 rounded-lg"
+                  >
+                    <div className="flex items-center gap-2 min-w-0">
+                      <span className="text-xs font-bold text-gray-400 w-5">#{idx + 1}</span>
+                      <div className="min-w-0">
+                        <p className="text-sm font-medium text-gray-900 truncate">
+                          {holder.name || shortenAddress(holder.address, 6)}
+                        </p>
+                        {holder.is_dex && (
+                          <span className="text-xs text-blue-600 font-semibold">DEX / Exchange</span>
+                        )}
+                      </div>
+                    </div>
+                    <div className="text-right flex-shrink-0">
+                      <p className={`text-sm font-bold ${
+                        holder.percentage > 20 ? 'text-red-700' :
+                        holder.percentage > 10 ? 'text-amber-700' :
+                        'text-gray-700'
+                      }`}>
+                        {holder.percentage.toFixed(1)}%
+                      </p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
           {/* AI Summary */}
           <div className="bg-white rounded-lg border border-gray-200 p-4 space-y-3">
             <h3 className="font-semibold text-gray-900 flex items-center gap-2">
               <CheckCircle className="w-5 h-5 text-blue-600" />
-              AI Analysis
+              Risk Analysis
             </h3>
             <div className="space-y-2">
               <p className="text-sm text-gray-700">{result.ai_summary.verdict}</p>
@@ -286,7 +410,7 @@ export default function JettonAnalysisPage() {
                         {signal.severity}
                       </span>
                       <span className="text-xs font-mono text-gray-500">
-                        +{signal.points}
+                        {signal.points > 0 ? '+' : ''}{signal.points}
                       </span>
                     </div>
                   </div>
@@ -294,6 +418,13 @@ export default function JettonAnalysisPage() {
               </div>
             </div>
           )}
+
+          {/* Skiplist Actions */}
+          <SkiplistButtons
+            target={address || result.metadata.symbol}
+            type="jetton"
+            label={`${result.metadata.name} (${result.metadata.symbol})`}
+          />
         </div>
       )}
     </div>

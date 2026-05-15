@@ -12,18 +12,36 @@ import {
   CheckCircle,
   XCircle,
   ExternalLink,
-  RefreshCw
+  RefreshCw,
+  DollarSign,
+  TrendingUp,
+  Wallet
 } from 'lucide-react';
 import { apiClient } from '@/lib/api/client';
 import type { WalletConnectionsResponse, JettonBalance, NFTItem } from '@/lib/api/types';
 
+// Extended type for enriched jettons from our API
+interface EnrichedJetton extends JettonBalance {
+  price_usd?: number;
+  value_usd?: number;
+  balance_formatted?: number;
+}
+
+interface EnrichedConnections extends WalletConnectionsResponse {
+  ton_balance?: number;
+  ton_balance_usd?: number;
+  ton_price_usd?: number;
+  total_portfolio_usd?: number;
+  jettons: EnrichedJetton[];
+}
+
 export default function WalletConnectionsPage() {
   const router = useRouter();
   const userWallet = useTonAddress();
-  const [connections, setConnections] = useState<WalletConnectionsResponse | null>(null);
+  const [connections, setConnections] = useState<EnrichedConnections | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
-  const [activeTab, setActiveTab] = useState<'domains' | 'jettons' | 'nfts'>('domains');
+  const [activeTab, setActiveTab] = useState<'domains' | 'jettons' | 'nfts'>('jettons');
 
   const loadConnections = async () => {
     if (!userWallet) {
@@ -36,7 +54,7 @@ export default function WalletConnectionsPage() {
 
     try {
       const data = await apiClient.getWalletConnections(userWallet);
-      setConnections(data);
+      setConnections(data as EnrichedConnections);
     } catch (err: any) {
       setError(err.message || 'Failed to load wallet connections');
     } finally {
@@ -55,6 +73,12 @@ export default function WalletConnectionsPage() {
     if (value === 0) return '0';
     if (value < 0.01) return '< 0.01';
     return value.toLocaleString(undefined, { maximumFractionDigits: 2 });
+  };
+
+  const formatUsd = (value: number | undefined) => {
+    if (value === undefined || value === 0) return '';
+    if (value < 0.01) return '< $0.01';
+    return `$${value.toLocaleString(undefined, { maximumFractionDigits: 2 })}`;
   };
 
   const getVerificationIcon = (verification: string) => {
@@ -138,6 +162,37 @@ export default function WalletConnectionsPage() {
         </button>
       </div>
 
+      {/* Portfolio Value */}
+      {connections && connections.total_portfolio_usd !== undefined && connections.total_portfolio_usd > 0 && (
+        <div className="bg-gradient-to-br from-indigo-600 to-purple-700 rounded-xl p-5 text-white shadow-lg">
+          <div className="flex items-center gap-2 mb-1">
+            <TrendingUp className="w-4 h-4 opacity-80" />
+            <p className="text-sm font-medium opacity-80">Total Portfolio Value</p>
+          </div>
+          <p className="text-3xl font-bold">
+            ${connections.total_portfolio_usd.toLocaleString(undefined, { maximumFractionDigits: 2 })}
+          </p>
+          {connections.ton_balance !== undefined && (
+            <div className="flex items-center gap-3 mt-3 pt-3 border-t border-white/20">
+              <div className="flex items-center gap-1.5">
+                <Wallet className="w-4 h-4 opacity-70" />
+                <span className="text-sm font-medium">{connections.ton_balance.toFixed(2)} TON</span>
+              </div>
+              {connections.ton_balance_usd !== undefined && connections.ton_balance_usd > 0 && (
+                <span className="text-sm opacity-70">
+                  (${connections.ton_balance_usd.toFixed(2)})
+                </span>
+              )}
+              {connections.ton_price_usd !== undefined && connections.ton_price_usd > 0 && (
+                <span className="text-xs opacity-50 ml-auto">
+                  1 TON = ${connections.ton_price_usd.toFixed(2)}
+                </span>
+              )}
+            </div>
+          )}
+        </div>
+      )}
+
       {/* Stats */}
       {connections && (
         <div className="grid grid-cols-3 gap-3">
@@ -175,17 +230,6 @@ export default function WalletConnectionsPage() {
         <>
           <div className="flex gap-2 border-b border-gray-200">
             <button
-              onClick={() => setActiveTab('domains')}
-              className={`px-4 py-2 font-semibold transition-colors ${
-                activeTab === 'domains'
-                  ? 'text-purple-600 border-b-2 border-purple-600'
-                  : 'text-gray-500 hover:text-gray-700'
-              }`}
-            >
-              <Globe className="w-4 h-4 inline mr-2" />
-              Domains
-            </button>
-            <button
               onClick={() => setActiveTab('jettons')}
               className={`px-4 py-2 font-semibold transition-colors ${
                 activeTab === 'jettons'
@@ -195,6 +239,17 @@ export default function WalletConnectionsPage() {
             >
               <Coins className="w-4 h-4 inline mr-2" />
               Tokens
+            </button>
+            <button
+              onClick={() => setActiveTab('domains')}
+              className={`px-4 py-2 font-semibold transition-colors ${
+                activeTab === 'domains'
+                  ? 'text-purple-600 border-b-2 border-purple-600'
+                  : 'text-gray-500 hover:text-gray-700'
+              }`}
+            >
+              <Globe className="w-4 h-4 inline mr-2" />
+              Domains
             </button>
             <button
               onClick={() => setActiveTab('nfts')}
@@ -211,6 +266,86 @@ export default function WalletConnectionsPage() {
 
           {/* Content */}
           <div className="space-y-3">
+            {/* Jettons Tab */}
+            {activeTab === 'jettons' && (
+              <>
+                {connections.jettons.length === 0 ? (
+                  <div className="text-center py-12">
+                    <Coins className="w-16 h-16 text-gray-300 mx-auto mb-4" />
+                    <p className="text-gray-500">No tokens found</p>
+                  </div>
+                ) : (
+                  connections.jettons
+                    .filter(j => parseFloat(j.balance) > 0)
+                    .sort((a, b) => (b.value_usd || 0) - (a.value_usd || 0))
+                    .map((jetton, idx) => (
+                      <div
+                        key={idx}
+                        className={`bg-white rounded-lg border p-4 ${
+                          jetton.jetton.verification === 'blacklist'
+                            ? 'border-red-300 bg-red-50'
+                            : 'border-gray-200'
+                        }`}
+                      >
+                        <div className="flex items-start justify-between mb-2">
+                          <div className="flex items-center gap-3">
+                            {jetton.jetton.image ? (
+                              <img
+                                src={jetton.jetton.image}
+                                alt={jetton.jetton.symbol}
+                                className="w-10 h-10 rounded-full"
+                              />
+                            ) : (
+                              <div className="w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center">
+                                <Coins className="w-5 h-5 text-blue-600" />
+                              </div>
+                            )}
+                            <div>
+                              <div className="flex items-center gap-2">
+                                <p className="font-semibold text-gray-900">{jetton.jetton.name}</p>
+                                {getVerificationIcon(jetton.jetton.verification)}
+                              </div>
+                              <p className="text-sm text-gray-600">{jetton.jetton.symbol}</p>
+                            </div>
+                          </div>
+                          {getTrustBadge(jetton.jetton.verification)}
+                        </div>
+                        
+                        <div className="mt-3 pt-3 border-t border-gray-100 flex items-end justify-between">
+                          <div>
+                            <p className="text-lg font-bold text-gray-900">
+                              {formatBalance(jetton.balance, jetton.jetton.decimals)} {jetton.jetton.symbol}
+                            </p>
+                          </div>
+                          {jetton.value_usd !== undefined && jetton.value_usd > 0 && (
+                            <div className="text-right">
+                              <p className="text-sm font-bold text-green-700 flex items-center gap-1">
+                                <DollarSign className="w-3.5 h-3.5" />
+                                {formatUsd(jetton.value_usd)}
+                              </p>
+                              {jetton.price_usd !== undefined && jetton.price_usd > 0 && (
+                                <p className="text-xs text-gray-400">
+                                  @ ${jetton.price_usd < 0.01 ? jetton.price_usd.toExponential(2) : jetton.price_usd.toFixed(4)}
+                                </p>
+                              )}
+                            </div>
+                          )}
+                        </div>
+
+                        {jetton.jetton.verification === 'blacklist' && (
+                          <div className="mt-3 bg-red-100 border border-red-200 rounded-lg p-2 flex items-center gap-2">
+                            <AlertCircle className="w-4 h-4 text-red-600" />
+                            <p className="text-xs text-red-800 font-semibold">
+                              ⚠️ This token is flagged as scam!
+                            </p>
+                          </div>
+                        )}
+                      </div>
+                    ))
+                )}
+              </>
+            )}
+
             {/* Domains Tab */}
             {activeTab === 'domains' && (
               <>
@@ -249,70 +384,6 @@ export default function WalletConnectionsPage() {
                       </a>
                     </div>
                   ))
-                )}
-              </>
-            )}
-
-            {/* Jettons Tab */}
-            {activeTab === 'jettons' && (
-              <>
-                {connections.jettons.length === 0 ? (
-                  <div className="text-center py-12">
-                    <Coins className="w-16 h-16 text-gray-300 mx-auto mb-4" />
-                    <p className="text-gray-500">No tokens found</p>
-                  </div>
-                ) : (
-                  connections.jettons
-                    .filter(j => parseFloat(j.balance) > 0)
-                    .map((jetton, idx) => (
-                      <div
-                        key={idx}
-                        className={`bg-white rounded-lg border p-4 ${
-                          jetton.jetton.verification === 'blacklist'
-                            ? 'border-red-300 bg-red-50'
-                            : 'border-gray-200'
-                        }`}
-                      >
-                        <div className="flex items-start justify-between mb-2">
-                          <div className="flex items-center gap-3">
-                            {jetton.jetton.image ? (
-                              <img
-                                src={jetton.jetton.image}
-                                alt={jetton.jetton.symbol}
-                                className="w-10 h-10 rounded-full"
-                              />
-                            ) : (
-                              <div className="w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center">
-                                <Coins className="w-5 h-5 text-blue-600" />
-                              </div>
-                            )}
-                            <div>
-                              <div className="flex items-center gap-2">
-                                <p className="font-semibold text-gray-900">{jetton.jetton.name}</p>
-                                {getVerificationIcon(jetton.jetton.verification)}
-                              </div>
-                              <p className="text-sm text-gray-600">{jetton.jetton.symbol}</p>
-                            </div>
-                          </div>
-                          {getTrustBadge(jetton.jetton.verification)}
-                        </div>
-                        
-                        <div className="mt-3 pt-3 border-t border-gray-100">
-                          <p className="text-lg font-bold text-gray-900">
-                            {formatBalance(jetton.balance, jetton.jetton.decimals)} {jetton.jetton.symbol}
-                          </p>
-                        </div>
-
-                        {jetton.jetton.verification === 'blacklist' && (
-                          <div className="mt-3 bg-red-100 border border-red-200 rounded-lg p-2 flex items-center gap-2">
-                            <AlertCircle className="w-4 h-4 text-red-600" />
-                            <p className="text-xs text-red-800 font-semibold">
-                              ⚠️ This token is flagged as scam!
-                            </p>
-                          </div>
-                        )}
-                      </div>
-                    ))
                 )}
               </>
             )}

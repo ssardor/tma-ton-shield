@@ -10,6 +10,10 @@ import {
   LinkResponse,
 } from '../api/types';
 
+// Minimum delay to show the beautiful scanning animation
+const ARTIFICIAL_DELAY_MS = 2800;
+const delay = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+
 export function useAnalyze() {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -20,7 +24,10 @@ export function useAnalyze() {
     setIsLoading(true);
     setError(null);
     try {
-      const result = await apiClient.analyzeTransaction(data);
+      const [result] = await Promise.all([
+        apiClient.analyzeTransaction(data),
+        delay(ARTIFICIAL_DELAY_MS),
+      ]);
       return result;
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Failed to analyze transaction';
@@ -35,7 +42,10 @@ export function useAnalyze() {
     setIsLoading(true);
     setError(null);
     try {
-      const result = await apiClient.analyzeAddress(address);
+      const [result] = await Promise.all([
+        apiClient.analyzeAddress(address),
+        delay(ARTIFICIAL_DELAY_MS),
+      ]);
       return result;
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Failed to analyze address';
@@ -50,7 +60,10 @@ export function useAnalyze() {
     setIsLoading(true);
     setError(null);
     try {
-      const result = await apiClient.analyzeJetton(address);
+      const [result] = await Promise.all([
+        apiClient.analyzeJetton(address),
+        delay(ARTIFICIAL_DELAY_MS),
+      ]);
       return result;
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Failed to analyze jetton';
@@ -65,7 +78,10 @@ export function useAnalyze() {
     setIsLoading(true);
     setError(null);
     try {
-      const result = await apiClient.analyzeLink(url);
+      const [result] = await Promise.all([
+        apiClient.analyzeLink(url),
+        delay(ARTIFICIAL_DELAY_MS),
+      ]);
       return result;
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Failed to analyze link';
@@ -85,3 +101,4 @@ export function useAnalyze() {
     error,
   };
 }
+

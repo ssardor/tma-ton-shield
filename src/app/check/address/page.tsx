@@ -5,9 +5,11 @@ import { useAnalyze } from '@/lib/hooks/useAnalyze';
 import { useTelegram } from '@/lib/hooks/useTelegram';
 import { AddressResponse } from '@/lib/api/types';
 import { RiskBadge } from '@/components/RiskBadge';
+import { SkiplistButtons } from '@/components/SkiplistButtons';
+import { ScanningAnimation } from '@/components/ScanningAnimation';
 import { isValidTonAddress, shortenAddress, formatTon, formatDate } from '@/lib/utils';
 import { saveToHistory } from '@/lib/storage/history';
-import { FileText, ArrowLeft, AlertCircle, CheckCircle } from 'lucide-react';
+import { FileText, ArrowLeft, AlertCircle, CheckCircle, ArrowUpRight, ArrowDownLeft, Clock, Activity } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 
 export default function AddressCheckPage() {
@@ -35,13 +37,10 @@ export default function AddressCheckPage() {
 
     hapticFeedback('light');
 
-    console.log('Analyzing address:', address);
     const data = await analyzeAddress(address);
-    console.log('Analysis result:', data);
     
     if (data) {
       setResult(data);
-      console.log('Result set successfully');
       
       // Save to history
       if (user) {
@@ -61,9 +60,19 @@ export default function AddressCheckPage() {
       } else {
         hapticFeedback('success');
       }
-    } else {
-      console.log('No data received from API');
     }
+  };
+
+  const formatAccountAge = (hours: number | null | undefined): string => {
+    if (hours === null || hours === undefined) return 'Unknown';
+    if (hours < 1) return `${Math.round(hours * 60)} minutes`;
+    if (hours < 24) return `${Math.round(hours)} hours`;
+    const days = Math.round(hours / 24);
+    if (days < 30) return `${days} days`;
+    const months = Math.round(days / 30);
+    if (months < 12) return `${months} months`;
+    const years = (days / 365).toFixed(1);
+    return `${years} years`;
   };
 
   return (
@@ -82,7 +91,7 @@ export default function AddressCheckPage() {
               <FileText className="w-6 h-6 text-green-600" />
               Address Check
             </h1>
-            <p className="text-sm text-gray-600">Verify wallet safety</p>
+            <p className="text-sm text-gray-600">Wallet security audit</p>
           </div>
         </div>
 
@@ -133,8 +142,11 @@ export default function AddressCheckPage() {
         )}
       </div>
 
+      {/* Loading Animation */}
+      {isLoading && <ScanningAnimation />}
+
       {/* Result */}
-      {result && (
+      {!isLoading && result && (
         <div className="space-y-4">
           {/* Risk Overview */}
           <div className="bg-white rounded-lg border border-gray-200 p-4 space-y-4">
@@ -156,26 +168,50 @@ export default function AddressCheckPage() {
                 <div className="grid grid-cols-2 gap-3 text-sm">
                   <div>
                     <p className="text-gray-600 mb-1">Type</p>
-                    <p className="font-medium">
+                    <p className="font-medium text-gray-900">
                       {result.account_info.is_wallet ? '👛 Wallet' : '📄 Contract'}
                     </p>
                   </div>
                   {result.account_info.balance && (
                     <div>
                       <p className="text-gray-600 mb-1">Balance</p>
-                      <p className="font-medium font-mono">
+                      <p className="font-medium font-mono text-gray-900">
                         {formatTon(result.account_info.balance)} TON
                       </p>
                     </div>
                   )}
                 </div>
 
-                {result.account_info.last_activity && (
-                  <div className="text-sm">
-                    <p className="text-gray-600 mb-1">Last Activity</p>
-                    <p className="font-medium">
-                      {formatDate(result.account_info.last_activity)}
+                {/* Account Age */}
+                <div className="grid grid-cols-2 gap-3 text-sm">
+                  <div>
+                    <p className="text-gray-600 mb-1 flex items-center gap-1">
+                      <Clock className="w-3.5 h-3.5" />
+                      Account Age
                     </p>
+                    <p className={`font-medium ${
+                      result.account_age_hours !== undefined && result.account_age_hours !== null && result.account_age_hours < 24 
+                        ? 'text-red-700' 
+                        : 'text-gray-900'
+                    }`}>
+                      {formatAccountAge(result.account_age_hours)}
+                    </p>
+                  </div>
+                  {result.account_info.last_activity && (
+                    <div>
+                      <p className="text-gray-600 mb-1">Last Activity</p>
+                      <p className="font-medium text-gray-900">
+                        {formatDate(result.account_info.last_activity)}
+                      </p>
+                    </div>
+                  )}
+                </div>
+
+                {/* Account name (if TON DNS) */}
+                {result.account_info.name && (
+                  <div className="text-sm">
+                    <p className="text-gray-600 mb-1">Name</p>
+                    <p className="font-medium text-purple-700">{result.account_info.name}</p>
                   </div>
                 )}
 
@@ -184,10 +220,10 @@ export default function AddressCheckPage() {
                     <AlertCircle className="w-5 h-5 text-red-600 flex-shrink-0" />
                     <div>
                       <p className="text-sm font-semibold text-red-900">
-                        Scam Warning
+                        ⚠️ CONFIRMED SCAM
                       </p>
                       <p className="text-sm text-red-700 mt-1">
-                        This address has been flagged as potentially malicious
+                        This address is flagged as scam in the TON security database
                       </p>
                     </div>
                   </div>
@@ -196,12 +232,60 @@ export default function AddressCheckPage() {
             )}
           </div>
 
+          {/* Recent Transactions */}
+          {result.recent_transactions && result.recent_transactions.length > 0 && (
+            <div className="bg-white rounded-lg border border-gray-200 p-4 space-y-3">
+              <h3 className="font-semibold text-gray-900 flex items-center gap-2">
+                <Activity className="w-5 h-5 text-blue-600" />
+                Recent Transactions ({result.recent_transactions.length})
+              </h3>
+              <div className="space-y-2">
+                {result.recent_transactions.map((tx, idx) => (
+                  <div key={idx} className="flex items-start gap-3 p-3 bg-gray-50 rounded-lg">
+                    <div className={`w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 ${
+                      tx.direction === 'in' ? 'bg-green-100' : 'bg-blue-100'
+                    }`}>
+                      {tx.direction === 'in' 
+                        ? <ArrowDownLeft className="w-4 h-4 text-green-600" />
+                        : <ArrowUpRight className="w-4 h-4 text-blue-600" />
+                      }
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center justify-between gap-2">
+                        <p className="text-sm font-medium text-gray-900 truncate">
+                          {tx.counterparty?.name || (tx.counterparty?.address ? shortenAddress(tx.counterparty.address, 6) : tx.type)}
+                        </p>
+                        {tx.amount && (
+                          <p className={`text-sm font-bold flex-shrink-0 ${
+                            tx.direction === 'in' ? 'text-green-700' : 'text-gray-900'
+                          }`}>
+                            {tx.direction === 'in' ? '+' : '-'}{tx.amount}
+                          </p>
+                        )}
+                      </div>
+                      <div className="flex items-center gap-2 mt-1">
+                        <p className="text-xs text-gray-500">
+                          {new Date(tx.timestamp * 1000).toLocaleDateString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                        </p>
+                        {tx.counterparty?.is_scam && (
+                          <span className="text-xs bg-red-100 text-red-700 px-1.5 py-0.5 rounded font-semibold">
+                            ⚠️ SCAM
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
           {/* AI Summary */}
           {result.ai_summary && (
             <div className="bg-white rounded-lg border border-gray-200 p-4 space-y-3">
               <h3 className="font-semibold text-gray-900 flex items-center gap-2">
                 <CheckCircle className="w-5 h-5 text-blue-600" />
-                AI Analysis
+                Risk Analysis
               </h3>
               <div className="space-y-2">
                 <p className="text-sm text-gray-700">{result.ai_summary.verdict}</p>
@@ -228,14 +312,12 @@ export default function AddressCheckPage() {
             </div>
           )}
 
-          {/* Transaction Pattern Analysis (NEW) */}
+          {/* Transaction Pattern Analysis */}
           {result.transaction_analysis && result.transaction_analysis.total_analyzed > 0 && (
             <div className="bg-gradient-to-br from-purple-50 to-blue-50 rounded-lg border border-purple-200 p-4 space-y-3">
               <div className="flex items-center gap-2">
                 <div className="w-8 h-8 bg-purple-600 rounded-lg flex items-center justify-center">
-                  <svg className="w-5 h-5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
-                  </svg>
+                  <Activity className="w-5 h-5 text-white" />
                 </div>
                 <div>
                   <h3 className="font-semibold text-gray-900">
@@ -247,13 +329,25 @@ export default function AddressCheckPage() {
                 </div>
               </div>
 
+              {/* TX Direction Stats */}
+              {(result.transaction_analysis as any).incoming_count !== undefined && (
+                <div className="grid grid-cols-2 gap-2">
+                  <div className="bg-white rounded-lg p-2 text-center">
+                    <p className="text-lg font-bold text-green-700">{(result.transaction_analysis as any).incoming_count}</p>
+                    <p className="text-xs text-gray-500">Incoming</p>
+                  </div>
+                  <div className="bg-white rounded-lg p-2 text-center">
+                    <p className="text-lg font-bold text-blue-700">{(result.transaction_analysis as any).outgoing_count}</p>
+                    <p className="text-xs text-gray-500">Outgoing</p>
+                  </div>
+                </div>
+              )}
+
               {result.transaction_analysis.suspicious_patterns.length > 0 && (
                 <div className="bg-white rounded-lg p-3 space-y-2">
                   <p className="text-sm font-semibold text-red-700 flex items-center gap-2">
-                    <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
-                      <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
-                    </svg>
-                    Suspicious Patterns Detected ({result.transaction_analysis.suspicious_patterns.length})
+                    <AlertCircle className="w-4 h-4" />
+                    Suspicious Patterns ({result.transaction_analysis.suspicious_patterns.length})
                   </p>
                   <div className="flex flex-wrap gap-2">
                     {result.transaction_analysis.suspicious_patterns.map((pattern, idx) => (
@@ -284,9 +378,7 @@ export default function AddressCheckPage() {
 
               {result.transaction_analysis.suspicious_patterns.length === 0 && (
                 <div className="bg-green-50 rounded-lg p-3 flex items-center gap-2">
-                  <svg className="w-5 h-5 text-green-600" fill="currentColor" viewBox="0 0 20 20">
-                    <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
-                  </svg>
+                  <CheckCircle className="w-5 h-5 text-green-600" />
                   <p className="text-sm text-green-800 font-medium">
                     No suspicious transaction patterns detected
                   </p>
@@ -328,7 +420,7 @@ export default function AddressCheckPage() {
                         {signal.severity}
                       </span>
                       <span className="text-xs font-mono text-gray-500">
-                        +{signal.points}
+                        {signal.points > 0 ? '+' : ''}{signal.points}
                       </span>
                     </div>
                   </div>
@@ -336,6 +428,13 @@ export default function AddressCheckPage() {
               </div>
             </div>
           )}
+
+          {/* Skiplist Actions */}
+          <SkiplistButtons
+            target={result.account_info.address}
+            type="address"
+            label={result.account_info.name || undefined}
+          />
         </div>
       )}
       </div>

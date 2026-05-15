@@ -79,143 +79,36 @@ class ApiClient {
 
   // Transaction Analysis
   async analyzeTransaction(data: TransactionRequest): Promise<TransactionResponse> {
-    console.log('API: Analyzing transaction', data);
-    const result = await this.request<any>('/analyze/transaction', {
+    const result = await this.request<TransactionResponse>('/api/v1/analyze/transaction', {
       method: 'POST',
       body: JSON.stringify(data),
     });
-    console.log('API: Transaction result', result);
-    
-    // Адаптируем ответ бэкенда к ожидаемому формату
-    return {
-      risk_level: result.risk_level,
-      risk_score: result.risk_score,
-      target_account_info: {
-        address: result.target_address || data.target_address,
-        is_wallet: result.target_account?.interfaces?.length === 0,
-        balance: result.target_account?.balance_nanoton?.toString() || '0',
-        is_scam: false,
-      },
-      signals: (result.signals || []).map((sig: string) => ({
-        category: 'Risk Signal',
-        message: sig,
-        severity: 'medium' as const,
-        points: 10,
-      })),
-      ai_summary: {
-        verdict: result.ai_explanation || 'No analysis available',
-        key_risks: result.signals || [],
-        recommendation: result.risk_level === 'CRITICAL' ? 'Do not proceed with this transaction' : 'Proceed with caution',
-      },
-      created_at: new Date().toISOString(),
-    };
+    return { ...result, created_at: result.created_at || new Date().toISOString() };
   }
 
-  // Address Check
+  // Address Check — now powered by real TON API Risk Engine
   async analyzeAddress(address: string): Promise<AddressResponse> {
-    console.log('API: Analyzing address', address);
-    const result = await this.request<any>(`/analyze/address/${encodeURIComponent(address)}`);
-    console.log('API: Address result', result);
-    
-    // Адаптируем ответ бэкенда
-    return {
-      risk_level: result.risk_level,
-      risk_score: result.risk_score,
-      account_info: {
-        address: result.address,
-        is_wallet: result.account?.interfaces?.length === 0,
-        is_scam: false,
-        balance: result.account?.balance_nanoton?.toString() || '0',
-        last_activity: new Date().toISOString(),
-      },
-      signals: (result.signals || []).map((sig: string) => ({
-        category: 'Risk Signal',
-        message: sig,
-        severity: 'medium' as const,
-        points: 10,
-      })),
-      ai_summary: {
-        verdict: result.ai_explanation || 'No analysis available',
-        key_risks: result.signals || [],
-        recommendation: result.risk_level === 'CRITICAL' ? 'Do not interact with this address' : 'Safe to interact',
-      },
-      created_at: new Date().toISOString(),
-    };
+    const result = await this.request<AddressResponse>(
+      `/api/v1/analyze/address/${encodeURIComponent(address)}`
+    );
+    return { ...result, created_at: result.created_at || new Date().toISOString() };
   }
 
-  // Jetton Analysis
+  // Jetton Analysis — real holder concentration + anti-rugpull
   async analyzeJetton(address: string): Promise<JettonResponse> {
-    console.log('API: Analyzing jetton', address);
-    const result = await this.request<any>(`/analyze/jetton/${encodeURIComponent(address)}`);
-    console.log('API: Jetton result', result);
-    
-    // Адаптируем ответ бэкенда
-    return {
-      metadata: {
-        name: result.metadata?.name || 'Unknown',
-        symbol: result.metadata?.symbol || '???',
-        decimals: parseInt(result.metadata?.decimals || '9'),
-        image: result.metadata?.image,
-        description: result.metadata?.description,
-      },
-      total_supply: result.metadata?.total_supply,
-      holder_count: result.holder_count,
-      admin_address: result.admin_address,
-      risk_level: result.risk_level,
-      risk_score: result.risk_score,
-      signals: (result.signals || []).map((sig: string) => ({
-        category: 'Risk Signal',
-        message: sig,
-        severity: result.risk_score > 50 ? 'high' as const : 'medium' as const,
-        points: 10,
-      })),
-      ai_summary: {
-        verdict: result.ai_verdict || 'No analysis available',
-        key_risks: result.signals || [],
-        recommendation: result.is_honeypot_suspected 
-          ? 'Potential honeypot detected - avoid interaction'
-          : result.risk_level === 'WARNING' 
-            ? 'Proceed with caution'
-            : 'Safe to interact',
-      },
-      created_at: new Date().toISOString(),
-    };
+    const result = await this.request<JettonResponse>(
+      `/api/v1/analyze/jetton/${encodeURIComponent(address)}`
+    );
+    return { ...result, created_at: result.created_at || new Date().toISOString() };
   }
 
-  // Link Scanner
+  // Link Scanner — keyword analysis + typosquatting detection
   async analyzeLink(url: string): Promise<LinkResponse> {
-    console.log('API: Analyzing link', url);
-    const result = await this.request<any>('/analyze/link', {
+    const result = await this.request<LinkResponse>('/api/v1/analyze/link', {
       method: 'POST',
       body: JSON.stringify({ url } as LinkRequest),
     });
-    console.log('API: Link result', result);
-    
-    // Адаптируем ответ бэкенда
-    return {
-      url: result.url,
-      domain: result.domain,
-      risk_level: result.risk_level,
-      risk_score: result.risk_score,
-      is_phishing: result.risk_level === 'CRITICAL',
-      is_telegram_link: result.is_telegram_link,
-      bot_username: result.bot_username,
-      telegram_analysis: result.telegram_analysis,
-      signals: (result.signals || []).map((sig: string) => ({
-        category: 'Risk Signal',
-        message: sig,
-        severity: 'medium' as const,
-        points: 10,
-      })),
-      ai_summary: {
-        verdict: result.ai_summary || 'No analysis available',
-        key_risks: result.signals || [],
-        recommendation: result.risk_level === 'CRITICAL' 
-          ? 'Do not visit this link - likely phishing'
-          : 'Proceed with caution',
-      },
-      created_at: new Date().toISOString(),
-    };
+    return { ...result, created_at: result.created_at || new Date().toISOString() };
   }
 
   // Dashboard
@@ -274,46 +167,12 @@ class ApiClient {
     };
   }
 
-  // Wallet Connections (domains, jettons, NFTs)
+  // Wallet Connections (domains, jettons, NFTs) — via server-side route with auth
   async getWalletConnections(address: string): Promise<WalletConnectionsResponse> {
     try {
-      console.log('Fetching wallet connections for:', address);
-      
-      const fetchWithFallback = async (url: string, fallbackData: any) => {
-        try {
-          console.log('Fetching:', url);
-          const response = await fetch(url);
-          console.log('Response status:', response.status, 'for', url);
-          
-          if (!response.ok) {
-            console.warn(`API returned ${response.status} for ${url}`);
-            return fallbackData;
-          }
-          
-          const data = await response.json();
-          console.log('Data received for', url, ':', data);
-          return data;
-        } catch (error) {
-          console.error('Fetch failed for', url, ':', error);
-          return fallbackData;
-        }
-      };
-
-      const [domainsData, jettonsData, nftsData] = await Promise.all([
-        fetchWithFallback(`https://tonapi.io/v2/accounts/${address}/dns/backresolve`, { domains: [] }),
-        fetchWithFallback(`https://tonapi.io/v2/accounts/${address}/jettons?limit=100`, { balances: [] }),
-        fetchWithFallback(`https://tonapi.io/v2/accounts/${address}/nfts?limit=100`, { nft_items: [] }),
-      ]);
-
-      const result = {
-        domains: domainsData.domains || [],
-        jettons: jettonsData.balances || [],
-        nfts: nftsData.nft_items || [],
-        total_jettons: jettonsData.balances?.length || 0,
-        total_nfts: nftsData.nft_items?.length || 0,
-      };
-      
-      console.log('Final connections data:', result);
+      const result = await this.request<WalletConnectionsResponse>(
+        `/api/v1/connections/${encodeURIComponent(address)}`
+      );
       return result;
     } catch (error) {
       console.error('Failed to fetch wallet connections:', error);
